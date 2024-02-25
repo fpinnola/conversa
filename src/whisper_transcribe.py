@@ -21,18 +21,20 @@ async def transcribe_audio(data: bytes, sample_rate: int = 16000):
     except Exception as e:
         print(f"Error transcribing audio: {e}")
 
-async def accumulate_and_transcribe(data: bytes, threshold: int = 16000 * 5, sample_rate = 16000):  # Example threshold for 10 seconds of audio at 16kHz
+async def accumulate_and_transcribe(data: bytes, threshold: int = 16000 * 5, sample_rate=16000):
     global audio_buffer
     audio_buffer += data  # Append new data to the buffer
-    
-    # Check if the buffer has reached the threshold
+
+    overlap = int(threshold * 0.2)  # 20% overlap
     if len(audio_buffer) >= threshold:
-        # Convert the buffer to a waveform and transcribe
-        waveform = convert_uint8_to_waveform(bytes(audio_buffer))
-        await transcribe_audio(waveform)
-        
-        # Clear the buffer
-        audio_buffer = bytearray()
+        # Process up to the threshold minus overlap
+        to_process = audio_buffer[:threshold-overlap]
+        waveform = convert_uint8_to_waveform(bytes(to_process), sample_rate)
+        asyncio.create_task(transcribe_audio(waveform, sample_rate))
+
+        # Keep the overlap for the next chunk
+        audio_buffer = audio_buffer[threshold-overlap:]
+
 
 
 if __name__ == "__main__":
