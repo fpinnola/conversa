@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse
 import asyncio
-from whisper_transcribe import transcribe_audio
+from whisper_transcribe import accumulate_and_transcribe
 
 
 @asynccontextmanager
@@ -19,7 +19,7 @@ audio_queue = asyncio.Queue()
 async def process_audio_queue():
     while True:
         audio_data = await audio_queue.get()
-        await transcribe_audio(audio_data)
+        await accumulate_and_transcribe(audio_data)
 
 
 @app.websocket("/audio-websocket/ws/audio/{callId}")
@@ -28,9 +28,7 @@ async def websocket_audio_endpoint(websocket: WebSocket):
     try:
         while True:
             data = await websocket.receive_bytes()
-            print(data)
-            # await audio_queue.put(data)
-            # await websocket.send_text("Data received")
+            await audio_queue.put(data)
     except WebSocketDisconnect:
         print(f"Websocket closed by client")
     except Exception as e:
