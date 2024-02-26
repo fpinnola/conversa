@@ -1,34 +1,38 @@
-from contextlib import asynccontextmanager
+from collections import defaultdict
+import queue
+import threading
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-from fastapi.responses import HTMLResponse
-import asyncio
 from whisper_transcribe import accumulate_and_transcribe
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    asyncio.create_task(process_audio_queue())
-    yield
 
-app = FastAPI(lifespan=lifespan)
+app = FastAPI()
 
-# Global queue for audio data
-audio_queue = asyncio.Queue()
+# This will store a queue.Queue for each callId.
+# defaultdict will automatically create a new queue if the callId doesn't exist yet.
+call_queues = defaultdict(queue.Queue)
 
-async def process_audio_queue():
-    while True:
-        audio_data = await audio_queue.get()
-        await accumulate_and_transcribe(audio_data)
+# Lock for thread-safe operations on call_queues
+queue_lock = threading.Lock()
 
 
 @app.websocket("/audio-websocket/ws/audio/{callId}")
-async def websocket_audio_endpoint(websocket: WebSocket):
+async def websocket_audio_endpoint(websocket: WebSocket, callId: str):
     await websocket.accept()
+    print(f"callId: {callId}")
+    with queue_lock:  # Ensure thread-safe access to the queues
+        # No need to explicitly check if callId exists; defaultdict handles it.
+        call_queue = call_queues[callId]
+    
     try:
         while True:
             data = await websocket.receive_bytes()
-            await audio_queue.put(data)
+            # Thread-safe as each queue is independent, but locking here to illustrate
+            # If you plan to modify the dictionary itself, keep the lock.
+            with queue_lock:
+                call_queue.put(data)  # Add received data to the appropriate queue
+
     except WebSocketDisconnect:
         print(f"Websocket closed by client")
     except Exception as e:
