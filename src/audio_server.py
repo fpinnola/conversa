@@ -3,36 +3,32 @@ import queue
 import threading
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-from whisper_transcribe import accumulate_and_transcribe
-
-
+from vad import VADDetect
 
 app = FastAPI()
 
-# This will store a queue.Queue for each callId.
-# defaultdict will automatically create a new queue if the callId doesn't exist yet.
-call_queues = defaultdict(queue.Queue)
-
-# Lock for thread-safe operations on call_queues
-queue_lock = threading.Lock()
-
+audio_queue = queue.Queue()
 
 @app.websocket("/audio-websocket/ws/audio/{callId}")
 async def websocket_audio_endpoint(websocket: WebSocket, callId: str):
     await websocket.accept()
     print(f"callId: {callId}")
-    with queue_lock:  # Ensure thread-safe access to the queues
-        # No need to explicitly check if callId exists; defaultdict handles it.
-        call_queue = call_queues[callId]
-    
+
+    audio_buffer = bytearray()
+    frame_size = 640
+
+    vad_thread = threading.Thread(target=VADDetect, args=(audio_queue,))
+    vad_thread.start()
+
     try:
         while True:
             data = await websocket.receive_bytes()
-            # Thread-safe as each queue is independent, but locking here to illustrate
-            # If you plan to modify the dictionary itself, keep the lock.
-            with queue_lock:
-                call_queue.put(data)  # Add received data to the appropriate queue
+            audio_buffer.extend(data)
 
+            while(len(audio_buffer) >= frame_size):
+                frame = audio_buffer[:frame_size]
+                audio_queue.put(frame)
+                audio_buffer = audio_buffer[frame_size:]
     except WebSocketDisconnect:
         print(f"Websocket closed by client")
     except Exception as e:
