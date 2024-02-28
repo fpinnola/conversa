@@ -41,8 +41,8 @@ class Audio(object):
         """Return a block of audio data, blocking if necessary."""
         try:
             return self.buffer_queue.get(timeout=1)
-        except:
-            print('Error')
+        except Exception as e:
+            print(f'Error {e}')
             return bytes()
 
     def destroy(self):
@@ -112,28 +112,21 @@ def VADDetect(audio_buffer=None, webRTC_aggressiveness=3, sample_rate=16000, cal
     print(f"frames {frames}")
 
     # Stream from microphone to DeepSpeech using VAD
-    spinner = None
     wav_data = bytearray()
 
     for frame in frames:
-        if frame is not None:
-            if spinner: spinner.start()
-
+        if frame is not None and len(wav_data) < 20000:
             wav_data.extend(frame)
-        else:
-            if spinner: spinner.stop()
+        elif len(wav_data) > 0:
             newsound= np.frombuffer(wav_data,np.int16)
             audio_float32=Int2Float(newsound)
             time_stamps =get_speech_ts(audio_float32, model)
-
             if(len(time_stamps)>0):
                 if callback:
                     callback("Speech")
-                # print("silero VAD has detected a possible speech")
             else:
                 if callback:
                     callback("Noise")
-                # print("silero VAD has detected a noise")
             print()
             wav_data = bytearray()
 

@@ -2,6 +2,7 @@ from collections import defaultdict
 import queue
 import collections
 import threading
+import time
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from vad import VADDetect, VADDetectSync
@@ -9,6 +10,47 @@ from vad import VADDetect, VADDetectSync
 app = FastAPI()
 
 audio_queue = queue.Queue()
+
+class SpeechDetector:
+    def __init__(self):
+        self.last_speech_timer = None
+        self.llm_timer = None
+        self.transcription_delay = 1.0
+        self.llm_delay = 3.0
+        self.is_speaking = False
+        self.is_paused = True
+        self.last_speech = 0
+        self.current_transcription = ''
+
+    def reset_timers(self):
+        if self.last_speech_timer is not None:
+            self.last_speech_timer.cancel()
+        if self.llm_timer is not None:
+            self.llm_timer.cancel()
+        
+        self.last_speech_timer = threading.Timer(self.transcription_delay, self.trigger_transcription)
+        self.llm_timer = threading.Timer(self.llm_delay, self.call_llm)
+
+        self.last_speech_timer.start()
+        self.llm_timer.start()
+
+    def trigger_transcription(self):
+        print("Trigger transcription")
+        self.is_paused = True
+    
+    def call_llm(self):
+        print("Call LLM")
+        self.is_speaking = False
+
+    def silero_response(self, res):
+        print(res)
+        if res == "Speech":
+            if not self.is_speaking:
+                self.is_paused = False
+                self.is_speaking = True
+            self.reset_timers()
+
+
 
 @app.websocket("/audio-websocket/ws/audio/{callId}")
 async def websocket_audio_endpoint(websocket: WebSocket, callId: str):
@@ -27,21 +69,9 @@ async def websocket_audio_endpoint(websocket: WebSocket, callId: str):
 
     current_transcription = ''
 
-    def silero_response(res):
-        if res == "Speech":
-            if not is_speaking:
-                is_paused = False
-                is_speaking = True
-        else:
-            if is_speaking:
-                # Trigger transcription if more than 90ms has passed and transcription buffer is not empty
-                
-                # Trigger LLM callback if more than 1s has passed
-                pass
+    detector = SpeechDetector()
 
-        print(res)
-
-    vad_thread = threading.Thread(target=VADDetect, kwargs={'audio_buffer': audio_queue, 'callback': silero_response})
+    vad_thread = threading.Thread(target=VADDetect, kwargs={'audio_buffer': audio_queue, 'callback': detector.silero_response})
     vad_thread.start()
 
     try:
