@@ -11,6 +11,7 @@ def convert_uint8_to_waveform(data: bytes, sample_rate: int = 16000):
     # Assuming data is 16-bit PCM, convert UInt8 array to int16
     waveform = np.frombuffer(data, dtype=np.int16)
     waveform = waveform.astype(np.float32) / np.iinfo(np.int16).max
+    print(waveform.shape)
     return waveform
 
 async def transcribe_audio(data: bytes, sample_rate: int = 16000):
@@ -20,6 +21,16 @@ async def transcribe_audio(data: bytes, sample_rate: int = 16000):
         print("Transcription:", result["text"])
     except Exception as e:
         print(f"Error transcribing audio: {e}")
+
+def preprocess_transcribe_audio(data: bytes, transcription_callback=None, sample_rate: int = 16000):
+        try:
+            # Transcribe the audio
+            waveform = convert_uint8_to_waveform(bytes(data), sample_rate)
+            result = model.transcribe(audio=waveform)
+            if transcription_callback is not None:
+                transcription_callback(result["text"])
+        except Exception as e:
+            print(f"Error transcribing audio: {e}")
 
 async def accumulate_and_transcribe(data: bytes, threshold: int = 16000 * 5, sample_rate=16000):
     global audio_buffer

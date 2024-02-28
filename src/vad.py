@@ -109,8 +109,6 @@ def VADDetect(audio_buffer=None, webRTC_aggressiveness=3, sample_rate=16000, cal
 
     frames = vad_audio.vad_collector(padding_ms=25)
 
-    print(f"frames {frames}")
-
     # Stream from microphone to DeepSpeech using VAD
     wav_data = bytearray()
 
@@ -127,7 +125,6 @@ def VADDetect(audio_buffer=None, webRTC_aggressiveness=3, sample_rate=16000, cal
             else:
                 if callback:
                     callback("Noise")
-            print()
             wav_data = bytearray()
 
 
