@@ -99,7 +99,7 @@ def VADDetect(audio_buffer=None, webRTC_aggressiveness=3, sample_rate=16000):
                          input_rate=sample_rate)
 
 
-    frames = vad_audio.vad_collector(padding_ms=30)
+    frames = vad_audio.vad_collector(padding_ms=25)
 
     print(f"frames {frames}")
 
