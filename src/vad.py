@@ -7,6 +7,14 @@ import webrtcvad
 import torch
 import torchaudio
 
+
+# load silero VAD
+torchaudio.set_audio_backend("soundfile")
+model, utils = torch.hub.load(repo_or_dir='snakers4/silero-vad',
+                                model="silero_vad",
+                                force_reload=False)
+(get_speech_ts,_,_, _,_) = utils
+
 class Audio(object):
     """Streams raw audio from microphone. Data is received in a separate thread, and stored in a buffer, to be read from."""
 
@@ -93,7 +101,7 @@ class VADAudio(Audio):
                     yield None
                     ring_buffer.clear()
 
-def VADDetect(audio_buffer=None, webRTC_aggressiveness=3, sample_rate=16000):
+def VADDetect(audio_buffer=None, webRTC_aggressiveness=3, sample_rate=16000, callback=None):
     # Start audio with VAD
     vad_audio = VADAudio(audio_buffer=audio_buffer, aggressiveness=webRTC_aggressiveness,
                          input_rate=sample_rate)
@@ -102,14 +110,6 @@ def VADDetect(audio_buffer=None, webRTC_aggressiveness=3, sample_rate=16000):
     frames = vad_audio.vad_collector(padding_ms=25)
 
     print(f"frames {frames}")
-
-    # load silero VAD
-    torchaudio.set_audio_backend("soundfile")
-    model, utils = torch.hub.load(repo_or_dir='snakers4/silero-vad',
-                                    model="silero_vad",
-                                    force_reload=False)
-    (get_speech_ts,_,_, _,_) = utils
-
 
     # Stream from microphone to DeepSpeech using VAD
     spinner = None
@@ -122,19 +122,38 @@ def VADDetect(audio_buffer=None, webRTC_aggressiveness=3, sample_rate=16000):
             wav_data.extend(frame)
         else:
             if spinner: spinner.stop()
-            print("webRTC has detected a possible speech")
-
             newsound= np.frombuffer(wav_data,np.int16)
             audio_float32=Int2Float(newsound)
             time_stamps =get_speech_ts(audio_float32, model)
 
             if(len(time_stamps)>0):
-                print("silero VAD has detected a possible speech")
+                if callback:
+                    callback("Speech")
+                # print("silero VAD has detected a possible speech")
             else:
-                print("silero VAD has detected a noise")
+                if callback:
+                    callback("Noise")
+                # print("silero VAD has detected a noise")
             print()
             wav_data = bytearray()
 
+
+def VADDetectSync(audio_buffer=None, webRTC_aggressiveness=3, sample_rate=16000, callback=None):
+    # print(len(audio_buffer))
+    newsound = np.frombuffer(audio_buffer, np.int16)
+    audio_float32=Int2Float(newsound)
+    time_stamps = get_speech_ts(audio_float32, model)
+
+    if (len(time_stamps) > 0):
+        if callback:
+            callback("Sound")
+        else:
+            print("silero VAD has detected speech")
+    else:
+        if callback:
+            callback("Noise")
+        else:
+            print("silero VAD has detected noise")
 
 def Int2Float(sound):
     _sound = np.copy(sound)
