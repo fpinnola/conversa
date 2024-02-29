@@ -11,7 +11,6 @@ class CallManager:
 
         return self.calls[callId]['utterances']
 
-
     def get_utterances_for_call(self, callId):
         if callId not in self.calls:
             return []

@@ -1,11 +1,18 @@
 import queue
 import threading
+import asyncio
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from dotenv import load_dotenv
+
+load_dotenv()
+
 from vad import VADDetect
 from whisper_transcribe import preprocess_transcribe_audio
 from call_management_service import CallManager
 from llm import LlmClient
+from tts import text_to_speech_input_streaming
+
 
 app = FastAPI()
 
@@ -90,9 +97,18 @@ async def websocket_audio_endpoint(websocket: WebSocket, callId: str):
     def complete_transcript():
         full_transcription = transcription_service.get_transcription_and_clear()
         print(f"Full transcript: {full_transcription}")
-        call_history = call_manager.add_utterance_to_call(callId, full_transcription, 'user')
         # Send to LLM
 
+        async def handle_async_stuff():
+            request = {}
+            request['transcript'] = call_manager.add_utterance_to_call(callId, full_transcription, 'user')
+            request['interaction_type'] = 'user_message'
+            request['response_id'] = 'test123'
+
+            await text_to_speech_input_streaming(voice_id='KQI7mgK11OmJF02kVxnK', text_iterator=llm_client.draft_response(request), out_websocket=websocket)
+
+
+        asyncio.run(handle_async_stuff())
 
     detector = SpeechDetector(transcription_callback=transcript, complete_callback=complete_transcript)
 

@@ -1,4 +1,4 @@
-from openai import OpenAI
+from openai import AsyncOpenAI
 import os
 
 beginSentence = "Hey there, I'm your personal AI therapist, how can I help you?"
@@ -6,7 +6,7 @@ agentPrompt = "Task: As a professional therapist, your responsibilities are comp
 
 class LlmClient:
     def __init__(self):
-        self.client = OpenAI(
+        self.client = AsyncOpenAI(
             # organization=os.environ['OPENAI_ORGANIZATION_ID'],
             api_key=os.environ['OPENAI_API_KEY'],
         )
@@ -51,15 +51,15 @@ class LlmClient:
             })
         return prompt
 
-    def draft_response(self, request):      
+    async def draft_response(self, request):      
         prompt = self.prepare_prompt(request)
-        stream = self.client.chat.completions.create(
+        stream = await self.client.chat.completions.create(
             model="gpt-3.5-turbo-1106",
             messages=prompt,
             stream=True,
         )
 
-        for chunk in stream:
+        async for chunk in stream:
             if chunk.choices[0].delta.content is not None:
                 yield {
                     "response_id": request['response_id'],
