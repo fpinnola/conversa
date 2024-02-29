@@ -2,7 +2,7 @@ import whisper
 import numpy as np
 import asyncio
 
-model = whisper.load_model("base")  # Load a Whisper model. Choose the model size that suits your needs.
+model = whisper.load_model("tiny")  # Load a Whisper model. Choose the model size that suits your needs.
 
 audio_buffer = bytearray()
 

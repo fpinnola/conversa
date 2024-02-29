@@ -13,8 +13,8 @@ class SpeechDetector:
     def __init__(self, transcription_callback, complete_callback=None):
         self.last_speech_timer = None
         self.llm_timer = None
-        self.transcription_delay = 1.5
-        self.llm_delay = 3.0
+        self.transcription_delay = 0.5
+        self.llm_delay = 2.5
         self.is_speaking = False
         self.is_paused = True
         self.last_speech = 0
