@@ -4,6 +4,8 @@ import threading
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from vad import VADDetect
 from whisper_transcribe import preprocess_transcribe_audio
+from call_management_service import CallManager
+from llm import LlmClient
 
 app = FastAPI()
 
@@ -64,6 +66,8 @@ class TranscriptionService:
         self.current_transcription = ""
         return res
 
+call_manager = CallManager()
+llm_client = LlmClient()
 
 @app.websocket("/audio-websocket/ws/audio/{callId}")
 async def websocket_audio_endpoint(websocket: WebSocket, callId: str):
@@ -86,7 +90,9 @@ async def websocket_audio_endpoint(websocket: WebSocket, callId: str):
     def complete_transcript():
         full_transcription = transcription_service.get_transcription_and_clear()
         print(f"Full transcript: {full_transcription}")
+        call_history = call_manager.add_utterance_to_call(callId, full_transcription, 'user')
         # Send to LLM
+
 
     detector = SpeechDetector(transcription_callback=transcript, complete_callback=complete_transcript)
 
@@ -96,9 +102,6 @@ async def websocket_audio_endpoint(websocket: WebSocket, callId: str):
     try:
         while True:
             data = await websocket.receive_bytes()
-
-            # if not is_speaking and len(transcription_buffer) > audio_padding_size :
-            #     transcription_buffer = transcription_buffer[audio_padding_size:]
             
             transcription_buffer.extend(data)
             vad_buffer.extend(data)
