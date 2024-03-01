@@ -94,6 +94,7 @@ async def text_to_speech_input_streaming(voice_id, text_iterator, out_websocket:
         listen_task = asyncio.create_task(listen())
 
         async for text in text_chunker(text_iterator):
+            print(f"tts: {text}")
             await websocket.send(json.dumps({"text": text, "try_trigger_generation": True}))
 
         await websocket.send(json.dumps({"text": ""}))

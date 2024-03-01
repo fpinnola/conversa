@@ -14,7 +14,7 @@ device = select_device()
 
 print(f"Using device {device}")
 
-model = whisper.load_model("tiny", device=device)  # Load a Whisper model. Choose the model size that suits your needs.
+model = whisper.load_model("base", device=device)  # Load a Whisper model. Choose the model size that suits your needs.
 
 audio_buffer = bytearray()
 

@@ -23,7 +23,7 @@ class SpeechDetector:
         self.last_speech_timer = None
         self.llm_timer = None
         self.transcription_delay = 0.5
-        self.llm_delay = 1.5
+        self.llm_delay = 3
         self.is_speaking = False
         self.is_paused = True
         self.last_speech = 0
@@ -107,8 +107,8 @@ async def websocket_audio_endpoint(websocket: WebSocket, callId: str):
 
             await text_to_speech_input_streaming(voice_id='KQI7mgK11OmJF02kVxnK', text_iterator=llm_client.draft_response(request), out_websocket=websocket)
 
-
-        asyncio.run(handle_async_stuff())
+        if len(full_transcription.strip()) > 0:
+            asyncio.run(handle_async_stuff())
 
     detector = SpeechDetector(transcription_callback=transcript, complete_callback=complete_transcript)
 
@@ -128,6 +128,7 @@ async def websocket_audio_endpoint(websocket: WebSocket, callId: str):
                 vad_buffer = vad_buffer[audio_padding_size:]
     except WebSocketDisconnect:
         print(f"Websocket closed by client")
+        print(f"Call history: {call_manager.get_utterances_for_call(callId)}")
     except Exception as e:
         print(f"Error: {e}")
         await websocket.close()
