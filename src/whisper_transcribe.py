@@ -1,8 +1,20 @@
 import whisper
 import numpy as np
 import asyncio
+import torch
 
-model = whisper.load_model("tiny")  # Load a Whisper model. Choose the model size that suits your needs.
+def select_device():
+    # Check for CUDA availability
+    if torch.cuda.is_available():
+        return torch.device('cuda')
+    else:
+        return torch.device('cpu')
+
+device = select_device()
+
+print(f"Using device {device}")
+
+model = whisper.load_model("tiny", device=device)  # Load a Whisper model. Choose the model size that suits your needs.
 
 audio_buffer = bytearray()
 
@@ -50,4 +62,5 @@ async def accumulate_and_transcribe(data: bytes, threshold: int = 16000 * 5, sam
 
 if __name__ == "__main__":
     # Example usage with dummy audio data
-    asyncio.run(transcribe_audio(b"Your audio data here"))
+    # asyncio.run(transcribe_audio(b"Your audio data here"))
+    print(f"cuda: {torch.cuda.is_available()}")

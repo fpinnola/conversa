@@ -101,22 +101,4 @@ async def text_to_speech_input_streaming(voice_id, text_iterator, out_websocket:
         await listen_task
 
 
-async def chat_completion(query):
-    """Retrieve text from OpenAI and pass it to the text-to-speech function."""
-    response = await aclient.chat.completions.create(model='gpt-4', messages=[{'role': 'user', 'content': query}],
-    temperature=1, stream=True)
-
-    async def text_iterator():
-        async for chunk in response:
-            delta = chunk.choices[0].delta
-            yield delta.content
-
-    await text_to_speech_input_streaming(VOICE_ID, text_iterator())
-
-
-# Main execution
-if __name__ == "__main__":
-    user_query = "Hello, tell me a very long story."
-    asyncio.run(chat_completion(user_query))
-
 

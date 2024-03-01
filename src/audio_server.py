@@ -23,7 +23,7 @@ class SpeechDetector:
         self.last_speech_timer = None
         self.llm_timer = None
         self.transcription_delay = 0.5
-        self.llm_delay = 2.5
+        self.llm_delay = 1.5
         self.is_speaking = False
         self.is_paused = True
         self.last_speech = 0
