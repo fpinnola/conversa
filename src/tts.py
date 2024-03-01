@@ -19,6 +19,13 @@ aclient = AsyncOpenAI(api_key=OPENAI_API_KEY)
 def is_installed(lib_name):
     return shutil.which(lib_name) is not None
 
+async def queue_to_async_generator(queue):
+    while True:
+        data = await queue.get()
+        if data is None:  # Use a specific condition to break the loop, such as receiving a None
+            break
+        yield data
+
 
 async def text_chunker(chunks):
     """Split text into chunks, ensuring to not break sentences."""
@@ -65,7 +72,7 @@ async def stream(audio_stream):
     mpv_process.wait()
 
 
-async def text_to_speech_input_streaming(voice_id, text_iterator, out_websocket: WebSocket):
+async def text_to_speech_input_streaming(voice_id, queue, out_websocket: WebSocket):
     """Send text to ElevenLabs API and stream the returned audio."""
     uri = f"wss://api.elevenlabs.io/v1/text-to-speech/{voice_id}/stream-input?model_id=eleven_monolingual_v1&output_format=pcm_16000"
 
@@ -93,8 +100,7 @@ async def text_to_speech_input_streaming(voice_id, text_iterator, out_websocket:
 
         listen_task = asyncio.create_task(listen())
 
-        async for text in text_chunker(text_iterator):
-            print(f"tts: {text}")
+        async for text in text_chunker(queue_to_async_generator(queue)):
             await websocket.send(json.dumps({"text": text, "try_trigger_generation": True}))
 
         await websocket.send(json.dumps({"text": ""}))

@@ -53,24 +53,28 @@ class LlmClient:
 
     async def draft_response(self, request):      
         prompt = self.prepare_prompt(request)
-        stream = await self.client.chat.completions.create(
-            model="gpt-3.5-turbo-1106",
-            messages=prompt,
-            stream=True,
-        )
+        try:
+            stream = await self.client.chat.completions.create(
+                model="gpt-3.5-turbo-1106",
+                messages=prompt,
+                stream=True,
+            )
 
-        async for chunk in stream:
-            if chunk.choices[0].delta.content is not None:
-                yield {
-                    "response_id": request['response_id'],
-                    "content": chunk.choices[0].delta.content,
-                    "content_complete": False,
-                    "end_call": False,
-                }
-        
-        yield {
-            "response_id": request['response_id'],
-            "content": "",
-            "content_complete": True,
-            "end_call": False,
-        }
+
+            async for chunk in stream:
+                if chunk.choices[0].delta.content is not None:
+                    yield {
+                        "response_id": request['response_id'],
+                        "content": chunk.choices[0].delta.content,
+                        "content_complete": False,
+                        "end_call": False,
+                    }
+            
+            yield {
+                "response_id": request['response_id'],
+                "content": "",
+                "content_complete": True,
+                "end_call": False,
+            }
+        except Exception as e:
+            print(f"Error: {e}")

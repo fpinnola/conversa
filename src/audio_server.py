@@ -72,6 +72,16 @@ class TranscriptionService:
         res = self.current_transcription
         self.current_transcription = ""
         return res
+    
+# Add items from Async Generator into a list of queues to be consumed by multiple consumers
+async def producer(ag, queues):
+    async for item in ag:
+        # print(f"producer got item {item}")
+        for q in queues:
+            await q.put(item)
+    for q in queues:
+        await q.put(None)  # Signal the consumers that the stream has ended
+
 
 call_manager = CallManager()
 llm_client = LlmClient()
@@ -105,7 +115,26 @@ async def websocket_audio_endpoint(websocket: WebSocket, callId: str):
             request['interaction_type'] = 'user_message'
             request['response_id'] = 'test123'
 
-            await text_to_speech_input_streaming(voice_id='KQI7mgK11OmJF02kVxnK', text_iterator=llm_client.draft_response(request), out_websocket=websocket)
+            queue1 = asyncio.Queue()
+            queue2 = asyncio.Queue()
+
+            ag = llm_client.draft_response(request)
+
+            async def consumer(queue):
+                agent_response = ''
+                while True:
+                    item = await queue.get()
+                    if item is None:
+                        break  # End of stream
+                    agent_response += item['content']
+                call_manager.add_utterance_to_call(callId, agent_response, 'agent')
+
+               # Start the producer and consumers
+            await asyncio.gather(
+                producer(ag, [queue1, queue2]),
+                text_to_speech_input_streaming(voice_id='KQI7mgK11OmJF02kVxnK', queue=queue1, out_websocket=websocket),               
+                consumer(queue2),
+            )
 
         if len(full_transcription.strip()) > 0:
             asyncio.run(handle_async_stuff())
