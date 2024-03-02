@@ -5,16 +5,11 @@ import base64
 import shutil
 import os
 import subprocess
-from openai import AsyncOpenAI
 from fastapi import WebSocket
 
 # Define API keys and voice ID
-OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 ELEVENLABS_API_KEY = os.getenv('ELEVENLABS_API_KEY')
 VOICE_ID = '21m00Tcm4TlvDq8ikWAM'
-
-# Set OpenAI API key
-aclient = AsyncOpenAI(api_key=OPENAI_API_KEY)
 
 def is_installed(lib_name):
     return shutil.which(lib_name) is not None
@@ -90,12 +85,10 @@ async def text_to_speech_input_streaming(voice_id, queue, out_websocket: WebSock
                     message = await websocket.recv()
                     data = json.loads(message)
                     if data.get("audio"):
-                        print("Got audio")
                         await out_websocket.send_bytes(base64.b64decode(data["audio"]))
                     elif data.get('isFinal'):
                         break
                 except websockets.exceptions.ConnectionClosed:
-                    print("Connection closed")
                     break
 
         listen_task = asyncio.create_task(listen())
