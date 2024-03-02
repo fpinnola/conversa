@@ -14,7 +14,7 @@ device = select_device()
 
 print(f"Using device {device}")
 
-model = whisper.load_model("base", device=device)  # Load a Whisper model. Choose the model size that suits your needs.
+model = whisper.load_model("base.en", device=device)  # Load a Whisper model. Choose the model size that suits your needs.
 
 audio_buffer = bytearray()
 
@@ -23,7 +23,6 @@ def convert_uint8_to_waveform(data: bytes, sample_rate: int = 16000):
     # Assuming data is 16-bit PCM, convert UInt8 array to int16
     waveform = np.frombuffer(data, dtype=np.int16)
     waveform = waveform.astype(np.float32) / np.iinfo(np.int16).max
-    print(waveform.shape)
     return waveform
 
 async def transcribe_audio(data: bytes, sample_rate: int = 16000):

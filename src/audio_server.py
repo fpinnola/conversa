@@ -7,11 +7,11 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from vad import VADDetect
-from whisper_transcribe import preprocess_transcribe_audio
+from hearing.vad import VADDetect
+from hearing.whisper_transcribe import preprocess_transcribe_audio
 from call_management_service import CallManager
-from llm import LlmClient
-from tts import text_to_speech_input_streaming
+from language.openai_client import OpenAILLMClient
+from speech.tts import text_to_speech_input_streaming
 
 
 app = FastAPI()
@@ -85,7 +85,7 @@ async def producer(ag, queues):
 
 
 call_manager = CallManager()
-llm_client = LlmClient()
+llm_client = OpenAILLMClient()
 
 @app.websocket("/audio-websocket/ws/audio/{callId}")
 async def websocket_audio_endpoint(websocket: WebSocket, callId: str):
@@ -100,13 +100,14 @@ async def websocket_audio_endpoint(websocket: WebSocket, callId: str):
     transcription_service = TranscriptionService()
 
     def transcript(transcription_buffer):
-        # print(len(transcription_buffer))
+        print(f"trascript called! with buffer size {len(transcription_buffer)}")
         transcribe_thread = threading.Thread(target=preprocess_transcribe_audio, kwargs={'data': bytes(transcription_buffer), 'transcription_callback': transcription_service.transcription_callback})
         transcription_buffer.clear()
         transcribe_thread.start()
 
     def complete_transcript():
         full_transcription = transcription_service.get_transcription_and_clear()
+        print(f"Querying LLM with transcript {full_transcription}")
 
         async def handle_async_stuff():
             request = {}
