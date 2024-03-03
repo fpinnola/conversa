@@ -1,5 +1,6 @@
 # Code based on example from: https://github.com/snakers4/silero-vad/blob/master/examples/microphone_and_webRTC_integration/microphone_and_webRTC_integration.py
 
+from queue import Empty
 import collections
 import numpy as np
 import pyaudio
@@ -41,8 +42,10 @@ class Audio(object):
         """Return a block of audio data, blocking if necessary."""
         try:
             return self.buffer_queue.get(timeout=1)
+        except Empty:
+            return bytes()
         except Exception as e:
-            print(f'Error {e}')
+            print(f'vad Error {e}')
             return bytes()
 
     def destroy(self):
@@ -57,15 +60,16 @@ class VADAudio(Audio):
     def __init__(self, audio_buffer=None, aggressiveness=3, input_rate=None, ):
         super().__init__(input_rate=input_rate, audio_buffer=audio_buffer)
         self.vad = webrtcvad.Vad(aggressiveness)
+        self.run_frames = True
 
     def frame_generator(self):
         """Generator that yields all audio frames from microphone."""
         if self.input_rate == self.RATE_PROCESS:
-            while True:
+            while self.run_frames:
                 yield self.read()
         else:
             raise Exception("Resampling required")
-
+        
     def  vad_collector(self, padding_ms=300, ratio=0.75, frames=None):
         """Generator that yields series of consecutive audio frames comprising each utterence, separated by yielding a single None.
             Determines voice activity by ratio of frames in padding_ms. Uses a buffer to include padding_ms prior to being triggered.

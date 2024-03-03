@@ -161,7 +161,7 @@ async def websocket_audio_endpoint(websocket: WebSocket, callId: str):
         print(f"Websocket closed by client")
         print(f"Call history: {call_manager.get_utterances_for_call(callId)}")
     except Exception as e:
-        print(f"Error: {e}")
+        print(f"socket Error: {e}")
         await websocket.close()
         
 
