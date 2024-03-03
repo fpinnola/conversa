@@ -1,6 +1,6 @@
 # Code based on example from: https://github.com/snakers4/silero-vad/blob/master/examples/microphone_and_webRTC_integration/microphone_and_webRTC_integration.py
 
-import collections, queue
+import collections
 import numpy as np
 import pyaudio
 import webrtcvad
@@ -66,7 +66,7 @@ class VADAudio(Audio):
         else:
             raise Exception("Resampling required")
 
-    def vad_collector(self, padding_ms=300, ratio=0.75, frames=None):
+    def  vad_collector(self, padding_ms=300, ratio=0.75, frames=None):
         """Generator that yields series of consecutive audio frames comprising each utterence, separated by yielding a single None.
             Determines voice activity by ratio of frames in padding_ms. Uses a buffer to include padding_ms prior to being triggered.
             Example: (frame, ..., frame, None, frame, ..., frame, None, ...)
@@ -87,6 +87,7 @@ class VADAudio(Audio):
                 ring_buffer.append((frame, is_speech))
                 num_voiced = len([f for f, speech in ring_buffer if speech])
                 if num_voiced > ratio * ring_buffer.maxlen:
+                    print(f"num voice {num_voiced} > {ratio * ring_buffer.maxlen}")
                     triggered = True
                     for f, s in ring_buffer:
                         yield f
@@ -97,6 +98,7 @@ class VADAudio(Audio):
                 ring_buffer.append((frame, is_speech))
                 num_unvoiced = len([f for f, speech in ring_buffer if not speech])
                 if num_unvoiced > ratio * ring_buffer.maxlen:
+                    print(f"num voice {num_voiced} > {ratio * ring_buffer.maxlen}")
                     triggered = False
                     yield None
                     ring_buffer.clear()
@@ -107,7 +109,7 @@ def VADDetect(audio_buffer=None, webRTC_aggressiveness=3, sample_rate=16000, cal
                          input_rate=sample_rate)
 
 
-    frames = vad_audio.vad_collector(padding_ms=25)
+    frames = vad_audio.vad_collector(padding_ms=30)
 
     # Stream from microphone to DeepSpeech using VAD
     wav_data = bytearray()
@@ -128,23 +130,6 @@ def VADDetect(audio_buffer=None, webRTC_aggressiveness=3, sample_rate=16000, cal
             wav_data = bytearray()
 
 
-def VADDetectSync(audio_buffer=None, webRTC_aggressiveness=3, sample_rate=16000, callback=None):
-    # print(len(audio_buffer))
-    newsound = np.frombuffer(audio_buffer, np.int16)
-    audio_float32=Int2Float(newsound)
-    time_stamps = get_speech_ts(audio_float32, model)
-
-    if (len(time_stamps) > 0):
-        if callback:
-            callback("Sound")
-        else:
-            print("silero VAD has detected speech")
-    else:
-        if callback:
-            callback("Noise")
-        else:
-            print("silero VAD has detected noise")
-
 def Int2Float(sound):
     _sound = np.copy(sound)
     abs_max = np.abs(_sound).max()
@@ -153,24 +138,3 @@ def Int2Float(sound):
         _sound *= 1/abs_max
     audio_float32 = torch.from_numpy(_sound.squeeze())
     return audio_float32
-
-import asyncio
-
-
-async def add_to_queue_test(buff):
-    while True:
-        await asyncio.sleep(1)
-        print('adding to queue')
-        buff.put(b'444')
-
-async def run_jobs(audio_queue):
-    task = asyncio.run(add_to_queue_test(audio_queue))
-
-
-if __name__ == '__main__':
-    DEFAULT_SAMPLE_RATE = 16000
-    audio_queue = queue.Queue()
-    audio_queue.put(b'123')
-    run_jobs(audio_queue)
-    VADDetect(audio_queue)
-    print(audio_queue.get())

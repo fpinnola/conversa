@@ -2,7 +2,7 @@ import os
 
 from openai import AsyncOpenAI
 
-from llm import LlmClient
+from language.llm import LlmClient
 
 class OpenAILLMClient(LlmClient):
     def __init__(self):
