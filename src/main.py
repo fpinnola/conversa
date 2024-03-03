@@ -1,4 +1,5 @@
 import queue
+import os
 import threading
 import asyncio
 
@@ -7,82 +8,18 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+from call_management_service import CallManager
 from hearing.vad import VADDetect
 from hearing.whisper_transcribe import preprocess_transcribe_audio
-from call_management_service import CallManager
+from hearing.speech_detector import SpeechDetector
+from hearing.transcription import TranscriptionService
 from language.openai_client import OpenAILLMClient
 from speech.tts import text_to_speech_input_streaming
 
+from utils.async_ops import producer
+
 
 app = FastAPI()
-
-audio_queue = queue.Queue()
-
-class SpeechDetector:
-    def __init__(self, transcription_callback, complete_callback=None, speech_callback=None, max_audio_padding=640*180):
-        self.last_speech_timer = None
-        self.llm_timer = None
-        self.transcription_delay = 0.5
-        self.llm_delay = 1.5
-        self.is_speaking = False
-        self.current_transcription = ''
-        self.transcription_callback = transcription_callback
-        self.complete_callback = complete_callback
-        self.speech_callback = speech_callback
-        self.audio_buffer = bytearray()
-        self.max_audio_padding = max_audio_padding
-
-    def reset_timers(self):
-        if self.last_speech_timer is not None:
-            self.last_speech_timer.cancel()
-        if self.llm_timer is not None:
-            self.llm_timer.cancel()
-        
-        self.last_speech_timer = threading.Timer(self.transcription_delay, self.transcription_callback, kwargs={'transcription_buffer': self.audio_buffer})
-        self.llm_timer = threading.Timer(self.llm_delay, self.call_llm)
-
-        self.last_speech_timer.start()
-        self.llm_timer.start()
-
-    def call_llm(self):
-        self.is_speaking = False
-        if self.complete_callback:
-            self.complete_callback()
-
-    def silero_response(self, res):
-        # print(res)
-        if res == "Speech":
-            if not self.is_speaking:
-                self.is_speaking = True
-            self.reset_timers()
-
-    def on_audio(self, audio: bytes):
-        self.audio_buffer.extend(audio)
-        if not self.is_speaking and len(self.audio_buffer) >= self.max_audio_padding:
-            self.audio_buffer = self.audio_buffer[self.max_audio_padding:]
-
-class TranscriptionService:
-    def __init__(self):
-        self.current_transcription = ""
-        pass
-
-    def transcription_callback(self, res):
-        self.current_transcription += res
-
-    def get_transcription_and_clear(self):
-        res = self.current_transcription
-        self.current_transcription = ""
-        return res
-    
-# Add items from Async Generator into a list of queues to be consumed by multiple consumers
-async def producer(ag, queues):
-    async for item in ag:
-        # print(f"producer got item {item}")
-        for q in queues:
-            await q.put(item)
-    for q in queues:
-        await q.put(None)  # Signal the consumers that the stream has ended
-
 
 call_manager = CallManager()
 llm_client = OpenAILLMClient()
@@ -91,6 +28,8 @@ llm_client = OpenAILLMClient()
 async def websocket_audio_endpoint(websocket: WebSocket, callId: str):
     await websocket.accept()
     print(f"callId: {callId}")
+
+    audio_queue = queue.Queue()
 
     vad_buffer = bytearray()
     transcription_buffer = bytearray()
@@ -168,4 +107,4 @@ async def websocket_audio_endpoint(websocket: WebSocket, callId: str):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=os.environ.get('PORT', 8000))
