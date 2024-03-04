@@ -89,6 +89,7 @@ async def text_to_speech_input_streaming(voice_id, queue, out_websocket: WebSock
                     elif data.get('isFinal'):
                         break
                 except websockets.exceptions.ConnectionClosed:
+                    print(f"tts connection closed")
                     break
 
         listen_task = asyncio.create_task(listen())

@@ -22,7 +22,6 @@ from utils.async_ops import producer
 app = FastAPI()
 
 call_manager = CallManager()
-llm_client = OpenAILLMClient()
 
 @app.websocket("/audio-websocket/ws/audio/{callId}")
 async def websocket_audio_endpoint(websocket: WebSocket, callId: str):
@@ -57,6 +56,7 @@ async def websocket_audio_endpoint(websocket: WebSocket, callId: str):
             queue1 = asyncio.Queue()
             queue2 = asyncio.Queue()
 
+            llm_client = OpenAILLMClient()
             ag = llm_client.draft_response(request)
 
             async def consumer(queue):
