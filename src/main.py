@@ -4,6 +4,7 @@ import threading
 import asyncio
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from pydantic import BaseModel
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -23,10 +24,30 @@ app = FastAPI()
 
 call_manager = CallManager()
 
+class CreateCallRequest(BaseModel):
+    voiceId: str
+
+@app.post("/call")
+async def create_call(request_body: CreateCallRequest = None):
+    print(f"VoiceId: {request_body.voiceId}")
+    response = call_manager.create_call(callProperties={
+        'voiceId': request_body.voiceId
+    })
+
+    return {"message": "Call created", "callObject": response}
+
+
 @app.websocket("/audio-websocket/ws/audio/{callId}")
 async def websocket_audio_endpoint(websocket: WebSocket, callId: str):
-    await websocket.accept()
     print(f"callId: {callId}")
+
+    call_properties = call_manager.get_call_properties(callId)
+    if call_properties is None:
+        await websocket.close(code=4001, reason="Call not found")
+        return  # Make sure to return after closing to prevent further execution
+
+    await websocket.accept()
+
 
     audio_queue = queue.Queue()
 
@@ -107,4 +128,5 @@ async def websocket_audio_endpoint(websocket: WebSocket, callId: str):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=os.environ.get('PORT', 8000))
+    MODE = os.environ.get("MODE", "production")
+    uvicorn.run("main:app", host="0.0.0.0", port=os.environ.get('PORT', 8000), reload=(MODE == 'development'))
