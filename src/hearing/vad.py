@@ -79,6 +79,7 @@ class VADAudio(Audio):
         if frames is None: frames = self.frame_generator()
 
         num_padding_frames = padding_ms // self.frame_duration_ms
+        print(f"num_padding_frames {num_padding_frames}")
         ring_buffer = collections.deque(maxlen=num_padding_frames)
         triggered = False
         for frame in frames:
@@ -91,37 +92,45 @@ class VADAudio(Audio):
                 ring_buffer.append((frame, is_speech))
                 num_voiced = len([f for f, speech in ring_buffer if speech])
                 if num_voiced > ratio * ring_buffer.maxlen:
-                    print(f"num voice {num_voiced} > {ratio * ring_buffer.maxlen}")
+                    # print(f"num voice {num_voiced} > {ratio * ring_buffer.maxlen}")
                     triggered = True
                     for f, s in ring_buffer:
                         yield f
-                    ring_buffer.clear()
+                    for _ in range(3):
+                        if len(ring_buffer) > 0:  # Check if the ring buffer is not empty
+                            ring_buffer.popleft()  # Remove the earliest item
+                    # ring_buffer.clear()
 
             else:
                 yield frame
                 ring_buffer.append((frame, is_speech))
                 num_unvoiced = len([f for f, speech in ring_buffer if not speech])
                 if num_unvoiced > ratio * ring_buffer.maxlen:
-                    print(f"num voice {num_voiced} > {ratio * ring_buffer.maxlen}")
                     triggered = False
                     yield None
-                    ring_buffer.clear()
+                    for _ in range(3):
+                        if len(ring_buffer) > 0:  # Check if the ring buffer is not empty
+                            ring_buffer.popleft()  # Remove the earliest item
+                    # ring_buffer.clear()
 
+
+import time
 def VADDetect(audio_buffer=None, webRTC_aggressiveness=3, sample_rate=16000, callback=None):
     # Start audio with VAD
     vad_audio = VADAudio(audio_buffer=audio_buffer, aggressiveness=webRTC_aggressiveness,
                          input_rate=sample_rate)
 
 
-    frames = vad_audio.vad_collector(padding_ms=30)
+    frames = vad_audio.vad_collector(padding_ms=200)
 
     # Stream from microphone to DeepSpeech using VAD
     wav_data = bytearray()
 
     for frame in frames:
-        if frame is not None and len(wav_data) < 20000:
+        if frame is not None:
             wav_data.extend(frame)
         elif len(wav_data) > 0:
+            print(f"wav_data size {len(wav_data)} time {len(wav_data) / 16}")
             newsound= np.frombuffer(wav_data,np.int16)
             audio_float32=Int2Float(newsound)
             time_stamps =get_speech_ts(audio_float32, model)

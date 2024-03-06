@@ -32,7 +32,6 @@ class SpeechDetector:
             self.complete_callback()
 
     def silero_response(self, res):
-        # print(res)
         if res == "Speech":
             if not self.is_speaking:
                 self.is_speaking = True
