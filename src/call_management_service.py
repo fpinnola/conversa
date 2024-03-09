@@ -8,13 +8,12 @@ class CreateCallBody(BaseModel):
 # TODO: integrate with DB
 class CallManager:
     def __init__(self):
-        self.calls = {}
         pass
 
     def get_call_properties(self, callId):
-        if callId not in self.calls:
+        if not callId in self.calls:
             return None
-        return self.calls['callId']['properties']
+        return self.calls[callId]['properties']
 
 
     def add_utterance_to_call(self, callId, text, role):
@@ -40,10 +39,10 @@ class CallManager:
     
     def create_call(self, callProperties: CreateCallBody):
         callId = self.generate_unique_call_id()
-        print(f"callId: {callId}")
         call = {
             'properties': callProperties,
-            'callId': callId
+            'callId': callId,
+            'utterances': []
         }
-        self.calls['callId'] = call
+        self.calls[callId] = call
         return call

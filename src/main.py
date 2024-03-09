@@ -37,24 +37,7 @@ async def create_call(request_body: CreateCallRequest = None):
     return {"message": "Call created", "callObject": response}
 
 
-from hearing.silero_vad_new import detect_speech
-@app.websocket("/audio-websocket/ws/audio1/{callId}")
-async def test_silero_endpoint(websocket: WebSocket, callId: str):
-    print(f"callId: {callId}")
-
-    audio_buffer = bytearray()
-    await websocket.accept()
-
-   
-
-
-    while True:
-        data = await websocket.receive_bytes()
-        audio_buffer.extend(data)
-        audio_buffer = detect_speech(audio_buffer)
-
-
-@app.websocket("/audio-websocket/ws/audio/{callId}")
+@app.websocket("/audio-ws/{callId}")
 async def websocket_audio_endpoint(websocket: WebSocket, callId: str):
     print(f"callId: {callId}")
     await websocket.accept()
