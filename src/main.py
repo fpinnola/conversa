@@ -16,6 +16,7 @@ from hearing.speech_detector import SpeechDetector
 from hearing.transcription import TranscriptionService
 from language.openai_client import OpenAILLMClient
 from speech.tts import text_to_speech_input_streaming
+from speech.voice_library import get_elevenlabs_voices
 
 from utils.async_ops import producer
 
@@ -26,6 +27,11 @@ call_manager = CallManager()
 
 class CreateCallRequest(BaseModel):
     voiceId: str
+
+@app.get('/voices')
+async def get_available_voices():
+    response = get_elevenlabs_voices()
+    return {"voices": response}
 
 @app.post("/call")
 async def create_call(request_body: CreateCallRequest = None):
