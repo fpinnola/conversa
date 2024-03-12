@@ -8,6 +8,7 @@ class CreateCallBody(BaseModel):
 # TODO: integrate with DB
 class CallManager:
     def __init__(self):
+        self.calls = {}
         pass
 
     def get_call_properties(self, callId):
