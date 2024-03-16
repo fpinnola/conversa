@@ -4,8 +4,8 @@ class SpeechDetector:
     def __init__(self, transcription_callback, complete_callback=None, speech_callback=None, max_audio_padding=640*180):
         self.last_speech_timer = None
         self.llm_timer = None
-        self.transcription_delay = 0.6
-        self.llm_delay = 1.5
+        self.transcription_delay = 0.2
+        self.llm_delay = 0.8
         self.is_speaking = False
         self.current_transcription = ''
         self.transcription_callback = transcription_callback
@@ -31,8 +31,8 @@ class SpeechDetector:
         if self.complete_callback:
             self.complete_callback()
 
-    def silero_response(self, res):
-        if res == "Speech":
+    def silero_response(self, val, prob):
+        if val == "Speech":
             if not self.is_speaking:
                 self.is_speaking = True
             self.reset_timers()

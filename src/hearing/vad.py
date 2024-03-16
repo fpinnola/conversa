@@ -1,153 +1,42 @@
-# Code based on example from: https://github.com/snakers4/silero-vad/blob/master/examples/microphone_and_webRTC_integration/microphone_and_webRTC_integration.py
-
-from queue import Empty
-import collections
-import numpy as np
-import pyaudio
-import webrtcvad
 import torch
-import torchaudio
+import numpy as np
+from utils.audio_ops import Int2Float
+
+async def vad_detect(audio_queue, threshold=0.75, callback=None):
+
+    # Load Silero VAD Model
+    model, _ = torch.hub.load(repo_or_dir='snakers4/silero-vad',
+                            model='silero_vad',
+                            force_reload=False)
 
 
-# load silero VAD
-torchaudio.set_audio_backend("soundfile")
-model, utils = torch.hub.load(repo_or_dir='snakers4/silero-vad',
-                                model="silero_vad",
-                                force_reload=False)
-(get_speech_ts,_,_, _,_) = utils
+    window_size_bytes = 512 * 2
+    window_size_samples = 512 
 
-class Audio(object):
-    """Streams raw audio from microphone. Data is received in a separate thread, and stored in a buffer, to be read from."""
+    audio_buffer = bytearray()
 
-    FORMAT = pyaudio.paInt16
-    # Network/VAD rate-space
-    RATE_PROCESS = 16000
-    CHANNELS = 1
-    BLOCKS_PER_SECOND = 50
+    while True:
+        data = await audio_queue.get()
+        audio_buffer.extend(data)
+        speech_probs2 = []
+        if len(audio_buffer) >= window_size_bytes:
+            first_N_bytes = audio_buffer[:window_size_bytes]
+    
+            numpy_array = np.frombuffer(first_N_bytes, dtype=np.int16)
+            wav = Int2Float(numpy_array)
+            
+            # Remove the N first bytes from the original bytearray
+            del audio_buffer[:window_size_bytes]
+            for i in range(0, len(wav), window_size_samples):
+                chunk = wav[i: i+window_size_samples]
+                if len(chunk) < window_size_samples:
+                    break
+                speech_prob = model(chunk, 16000).item()
+                speech_probs2.append(speech_prob)
+                if callback is not None:
+                    if speech_prob >= threshold:
+                        callback("Speech", speech_prob)
+                    else:
+                        callback("None", speech_prob)
 
-    def __init__(self, audio_buffer=None, callback=None, input_rate=RATE_PROCESS):
-        if callback is None: callback = lambda in_data: self.buffer_queue.put(in_data)
-
-        self.input_rate = input_rate
-        self.sample_rate = self.RATE_PROCESS
-        self.block_size = int(self.RATE_PROCESS / float(self.BLOCKS_PER_SECOND))
-        self.block_size_input = int(self.input_rate / float(self.BLOCKS_PER_SECOND))
-
-        if audio_buffer is not None:
-            print(f"audio buffer {audio_buffer}")
-            self.buffer_queue = audio_buffer
-            return
-
-    def read(self):
-        """Return a block of audio data, blocking if necessary."""
-        try:
-            return self.buffer_queue.get(timeout=1)
-        except Empty:
-            return bytes()
-        except Exception as e:
-            print(f'vad Error {e}')
-            return bytes()
-
-    def destroy(self):
-        pass
-
-    frame_duration_ms = property(lambda self: 1000 * self.block_size // self.sample_rate)
-
-
-class VADAudio(Audio):
-    """Filter & segment audio with voice activity detection."""
-
-    def __init__(self, audio_buffer=None, aggressiveness=3, input_rate=None, ):
-        super().__init__(input_rate=input_rate, audio_buffer=audio_buffer)
-        self.vad = webrtcvad.Vad(aggressiveness)
-        self.run_frames = True
-
-    def frame_generator(self):
-        """Generator that yields all audio frames from microphone."""
-        if self.input_rate == self.RATE_PROCESS:
-            while self.run_frames:
-                yield self.read()
-        else:
-            raise Exception("Resampling required")
-        
-    def  vad_collector(self, padding_ms=300, ratio=0.75, frames=None):
-        """Generator that yields series of consecutive audio frames comprising each utterence, separated by yielding a single None.
-            Determines voice activity by ratio of frames in padding_ms. Uses a buffer to include padding_ms prior to being triggered.
-            Example: (frame, ..., frame, None, frame, ..., frame, None, ...)
-                      |---utterence---|        |---utterence---|
-        """
-        if frames is None: frames = self.frame_generator()
-
-        num_padding_frames = padding_ms // self.frame_duration_ms
-        print(f"num_padding_frames {num_padding_frames}")
-        ring_buffer = collections.deque(maxlen=num_padding_frames)
-        triggered = False
-        for frame in frames:
-            if len(frame) < 640:
-                return
-
-            is_speech = self.vad.is_speech(frame, self.sample_rate)
-
-            if not triggered:
-                ring_buffer.append((frame, is_speech))
-                num_voiced = len([f for f, speech in ring_buffer if speech])
-                if num_voiced > ratio * ring_buffer.maxlen:
-                    # print(f"num voice {num_voiced} > {ratio * ring_buffer.maxlen}")
-                    triggered = True
-                    for f, s in ring_buffer:
-                        yield f
-                    for _ in range(3):
-                        if len(ring_buffer) > 0:  # Check if the ring buffer is not empty
-                            ring_buffer.popleft()  # Remove the earliest item
-                    # ring_buffer.clear()
-
-            else:
-                yield frame
-                ring_buffer.append((frame, is_speech))
-                num_unvoiced = len([f for f, speech in ring_buffer if not speech])
-                if num_unvoiced > ratio * ring_buffer.maxlen:
-                    triggered = False
-                    yield None
-                    for _ in range(3):
-                        if len(ring_buffer) > 0:  # Check if the ring buffer is not empty
-                            ring_buffer.popleft()  # Remove the earliest item
-                    # ring_buffer.clear()
-
-
-import time
-def VADDetect(audio_buffer=None, webRTC_aggressiveness=3, sample_rate=16000, callback=None):
-    # Start audio with VAD
-    vad_audio = VADAudio(audio_buffer=audio_buffer, aggressiveness=webRTC_aggressiveness,
-                         input_rate=sample_rate)
-
-
-    frames = vad_audio.vad_collector(padding_ms=200)
-
-    # Stream from microphone to DeepSpeech using VAD
-    wav_data = bytearray()
-
-    for frame in frames:
-        if frame is not None:
-            wav_data.extend(frame)
-        elif len(wav_data) > 0:
-            print(f"wav_data size {len(wav_data)} time {len(wav_data) / 16}")
-            newsound= np.frombuffer(wav_data,np.int16)
-            audio_float32=Int2Float(newsound)
-            time_stamps =get_speech_ts(audio_float32, model)
-            if(len(time_stamps)>0):
-                if callback:
-                    callback("Speech")
-            else:
-                if callback:
-                    callback("Noise")
-            wav_data = bytearray()
-
-
-def Int2Float(sound):
-    _sound = np.copy(sound)
-    abs_max = np.abs(_sound).max()
-    _sound = _sound.astype('float32')
-    if abs_max > 0:
-        _sound *= 1/abs_max
-    audio_float32 = torch.from_numpy(_sound.squeeze())
-    return audio_float32
+        audio_queue.task_done()

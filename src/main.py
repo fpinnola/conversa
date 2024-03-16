@@ -11,7 +11,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from call_management_service import CallManager
-from hearing.vad import VADDetect
+from hearing.vad import vad_detect
 from hearing.whisper_transcribe import preprocess_transcribe_audio
 from hearing.speech_detector import SpeechDetector
 from hearing.transcription import TranscriptionService
@@ -52,7 +52,6 @@ async def create_call(request_body: CreateCallRequest = None):
 
     return {"message": "Call created", "callObject": response}
 
-
 @app.websocket("/audio-ws/{callId}")
 async def websocket_audio_endpoint(websocket: WebSocket, callId: str):
     print(f"callId: {callId}")
@@ -63,11 +62,10 @@ async def websocket_audio_endpoint(websocket: WebSocket, callId: str):
         await websocket.close(code=4001, reason="Call not found")
         return  # Make sure to return after closing to prevent further execution
 
-    audio_queue = queue.Queue()
+    audio_queue = asyncio.Queue()
 
-    vad_buffer = bytearray()
     transcription_buffer = bytearray()
-    audio_padding_size = 640 * 1 # ~ 30ms audio data?
+    audio_padding_size = 512 * 1 # ~ 30ms audio data?
 
 
     transcription_service = TranscriptionService()
@@ -115,21 +113,15 @@ async def websocket_audio_endpoint(websocket: WebSocket, callId: str):
 
     detector = SpeechDetector(transcription_callback=transcript, complete_callback=complete_transcript, max_audio_padding=audio_padding_size*180)
 
-    vad_thread = threading.Thread(target=VADDetect, kwargs={'audio_buffer': audio_queue, 'callback': detector.silero_response})
-    vad_thread.start()
+    task = asyncio.create_task(vad_detect(audio_queue=audio_queue, callback=detector.silero_response))
 
     try:
         while True:
             data = await websocket.receive_bytes()
             
             transcription_buffer.extend(data)
-            vad_buffer.extend(data)
+            await audio_queue.put(data)
             detector.on_audio(data)
-
-            while(len(vad_buffer) >= audio_padding_size):
-                frame = vad_buffer[:audio_padding_size]
-                audio_queue.put(frame)
-                vad_buffer = vad_buffer[audio_padding_size:]
 
     except WebSocketDisconnect:
         print(f"Websocket closed by client")
@@ -137,6 +129,8 @@ async def websocket_audio_endpoint(websocket: WebSocket, callId: str):
     except Exception as e:
         print(f"socket Error: {e}")
         await websocket.close()
+    finally:
+        task.cancel()
         
 
 
