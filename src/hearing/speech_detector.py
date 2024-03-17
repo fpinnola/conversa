@@ -5,7 +5,7 @@ class SpeechDetector:
         self.last_speech_timer = None
         self.llm_timer = None
         self.transcription_delay = 0.2
-        self.llm_delay = 0.8
+        self.llm_delay = 4.0
         self.is_speaking = False
         self.current_transcription = ''
         self.transcription_callback = transcription_callback
@@ -41,3 +41,12 @@ class SpeechDetector:
         self.audio_buffer.extend(audio)
         if not self.is_speaking and len(self.audio_buffer) >= self.max_audio_padding:
             self.audio_buffer = self.audio_buffer[self.max_audio_padding:]
+
+    def transcription_complete(self, res):
+        self.current_transcription += res
+
+    def get_transcription_and_clear(self):
+        res = self.current_transcription
+        self.current_transcription = ""
+        return res
+    

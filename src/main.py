@@ -14,7 +14,6 @@ from call_management_service import CallManager
 from hearing.vad import vad_detect
 from hearing.whisper_transcribe import preprocess_transcribe_audio
 from hearing.speech_detector import SpeechDetector
-from hearing.transcription import TranscriptionService
 from language.openai_client import OpenAILLMClient
 from speech.tts import text_to_speech_input_streaming
 from speech.voice_library import get_elevenlabs_voices
@@ -68,16 +67,14 @@ async def websocket_audio_endpoint(websocket: WebSocket, callId: str):
     audio_padding_size = 512 * 1 # ~ 30ms audio data?
 
 
-    transcription_service = TranscriptionService()
-
     def transcript(transcription_buffer):
         print(f"trascript called! with buffer size {len(transcription_buffer)}")
-        transcribe_thread = threading.Thread(target=preprocess_transcribe_audio, kwargs={'data': bytes(transcription_buffer), 'transcription_callback': transcription_service.transcription_callback})
+        transcribe_thread = threading.Thread(target=preprocess_transcribe_audio, kwargs={'data': bytes(transcription_buffer), 'transcription_callback': detector.transcription_complete})
         transcription_buffer.clear()
         transcribe_thread.start()
 
     def complete_transcript():
-        full_transcription = transcription_service.get_transcription_and_clear()
+        full_transcription = detector.get_transcription_and_clear()
         print(f"Querying LLM with transcript {full_transcription}")
 
         async def handle_async_stuff():
