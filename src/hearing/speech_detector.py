@@ -44,9 +44,55 @@ class SpeechDetector:
 
     def transcription_complete(self, res):
         self.current_transcription += res
+        if self.estimate_end_of_query(res):
+            self.reset_timers()
+            self.call_llm()
 
     def get_transcription_and_clear(self):
         res = self.current_transcription
         self.current_transcription = ""
         return res
     
+    def estimate_end_of_query(self, transcript_chunk):
+        """
+        Estimates whether a chunk of transcript text is likely the end of a query.
+        
+        Args:
+        transcript_chunk (str): A chunk of text from the speech-to-text output.
+        
+        Returns:
+        bool: True if it's likely the end of the query, False otherwise.
+        """
+        # List of conjunctions, fillers, or phrases that might indicate more to come
+        continuation_cues = ['and', 'or', 'but', 'you know', 'so', 'um', 'uh']
+        
+        # Check for explicit continuation with '...'
+        if transcript_chunk.strip().endswith('...'):
+            return False
+
+        # Check for ending punctuation, considering Whisper's behavior
+        if transcript_chunk.strip().endswith('.'):
+            # If the transcript ends with a '.', but the context suggests it's not a conclusive end
+            words = transcript_chunk.strip().split()
+            if len(words) < 3:  # Very short phrase ending with a '.', might not be conclusive
+                return False
+            if words[-2].lower() in continuation_cues:
+                return False  # Ending with a continuation cue before the period
+            
+        # Check for ending punctuation
+        if transcript_chunk.strip().endswith(('.', '?', '!')):
+            return True
+        
+        # Check for continuation cues at the end of the chunk
+        words = transcript_chunk.strip().split()
+        if len(words) == 0:
+            return False  # Empty input
+        if words[-1].lower() in continuation_cues:
+            return False
+        
+        # If the last word is cut off, we might be in the middle of speaking
+        if words[-1][-1] == '-':
+            return False
+        
+        # Default to not the end if none of the above conditions are met
+        return False
