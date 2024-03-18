@@ -3,14 +3,13 @@ from hearing.whisper_transcribe import preprocess_transcribe_audio
 
 
 class SpeechDetector:
-    def __init__(self, transcription_callback, complete_callback=None, speech_callback=None, max_audio_padding=640*180):
+    def __init__(self, complete_callback=None, speech_callback=None, max_audio_padding=640*180):
         self.last_speech_timer = None
         self.llm_timer = None
         self.transcription_delay = 0.2
         self.llm_delay = 4.0
         self.is_speaking = False
         self.current_transcription = ''
-        self.transcription_callback = transcription_callback
         self.complete_callback = complete_callback
         self.speech_callback = speech_callback
         self.audio_buffer = bytearray()

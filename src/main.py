@@ -98,7 +98,7 @@ async def websocket_audio_endpoint(websocket: WebSocket, callId: str):
         if len(full_transcription.strip()) > 0:
             asyncio.run(handle_async_stuff())
 
-    detector = SpeechDetector(transcription_callback=transcript, complete_callback=complete_transcript, max_audio_padding=audio_padding_size*180)
+    detector = SpeechDetector(complete_callback=complete_transcript, max_audio_padding=audio_padding_size*180)
 
     task = asyncio.create_task(vad_detect(audio_queue=audio_queue, callback=detector.silero_response))
 
