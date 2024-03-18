@@ -13,7 +13,7 @@ class OpenAILLMClient(LlmClient):
         )
 
 
-    def draft_begin_messsage(self):
+    def draft_begin_message(self):
         return {
             "response_id": 0,
             "content": self.beginSentence,

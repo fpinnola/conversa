@@ -10,7 +10,7 @@ class LlmClient(ABC):
         self.agentPrompt = agentPrompt
     
     @abstractmethod
-    def draft_begin_messsage(self):
+    def draft_begin_message(self):
         pass
 
     @abstractmethod

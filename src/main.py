@@ -63,6 +63,15 @@ async def websocket_audio_endpoint(websocket: WebSocket, callId: str):
     transcription_buffer = bytearray()
     audio_padding_size = 512 * 1 # ~ 30ms audio data?
 
+    async def agent_text_consumer(queue):
+        agent_response = ''
+        while True:
+            item = await queue.get()
+            if item is None:
+                break  # End of stream
+            agent_response += item['content']
+        call_manager.add_utterance_to_call(callId, agent_response, 'agent')
+
     def complete_transcript():
         full_transcription = detector.get_transcription_and_clear()
         print(f"Querying LLM with transcript {full_transcription}")
@@ -79,24 +88,42 @@ async def websocket_audio_endpoint(websocket: WebSocket, callId: str):
             llm_client = OpenAILLMClient()
             ag = llm_client.draft_response(request)
 
-            async def consumer(queue):
-                agent_response = ''
-                while True:
-                    item = await queue.get()
-                    if item is None:
-                        break  # End of stream
-                    agent_response += item['content']
-                call_manager.add_utterance_to_call(callId, agent_response, 'agent')
 
-               # Start the producer and consumers
             await asyncio.gather(
                 producer(ag, [queue1, queue2]),
                 text_to_speech_input_streaming(voice_id='KQI7mgK11OmJF02kVxnK', queue=queue1, out_websocket=websocket),               
-                consumer(queue2),
+                agent_text_consumer(queue2),
             )
 
         if len(full_transcription.strip()) > 0:
             asyncio.run(handle_async_stuff())
+
+    async def begin_call():
+            llm_client = OpenAILLMClient()
+
+            message = llm_client.draft_begin_message()
+
+            message_queue = asyncio.Queue()
+
+            async def temp_ag():
+                await message_queue.put(message)
+            
+                await message_queue.put({
+                    "response_id": 0,
+                    "content": "",
+                    "content_complete": True,
+                    "end_call": False,
+                })
+
+
+            await asyncio.gather(
+                temp_ag(),
+                text_to_speech_input_streaming(voice_id='KQI7mgK11OmJF02kVxnK', queue=message_queue, out_websocket=websocket, autoflush=True), 
+            )
+
+
+    begin_task = asyncio.create_task(begin_call())
+
 
     detector = SpeechDetector(complete_callback=complete_transcript, max_audio_padding=audio_padding_size*180)
 
@@ -117,6 +144,7 @@ async def websocket_audio_endpoint(websocket: WebSocket, callId: str):
         print(f"socket Error: {e}")
         await websocket.close()
     finally:
+        begin_task.cancel()
         task.cancel()
         
 

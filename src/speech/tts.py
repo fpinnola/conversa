@@ -67,7 +67,7 @@ async def stream(audio_stream):
     mpv_process.wait()
 
 
-async def text_to_speech_input_streaming(voice_id, queue, out_websocket: WebSocket):
+async def text_to_speech_input_streaming(voice_id, queue, out_websocket: WebSocket, autoflush=False):
     """Send text to ElevenLabs API and stream the returned audio."""
     uri = f"wss://api.elevenlabs.io/v1/text-to-speech/{voice_id}/stream-input?model_id=eleven_monolingual_v1&output_format=pcm_16000"
 
@@ -95,11 +95,9 @@ async def text_to_speech_input_streaming(voice_id, queue, out_websocket: WebSock
         listen_task = asyncio.create_task(listen())
 
         async for text in text_chunker(queue_to_async_generator(queue)):
-            await websocket.send(json.dumps({"text": text, "try_trigger_generation": True}))
+            await websocket.send(json.dumps({"text": text, "try_trigger_generation": True, "flush": autoflush}))
 
         await websocket.send(json.dumps({"text": ""}))
 
         await listen_task
-
-
 
