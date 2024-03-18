@@ -13,13 +13,14 @@ device = select_device()
 
 print(f"Whisper using device {device}")
 
-model = whisper.load_model("small.en", device=device)  # Load a Whisper model. Choose the model size that suits your needs.
+model = whisper.load_model("tiny.en", device=device)  # Load a Whisper model. Choose the model size that suits your needs.
 
 audio_buffer = bytearray()
 
 from utils.audio_ops import Int2Float
 
-def preprocess_transcribe_audio(data: bytes, transcription_callback=None, sample_rate: int = 16000):
+def preprocess_transcribe_audio(data: bytes, transcription_callback=None):
+        print(len(data))
         try:
             # Transcribe the audio
             sound = np.frombuffer(data, dtype=np.int16)

@@ -1,4 +1,6 @@
 import threading
+from hearing.whisper_transcribe import preprocess_transcribe_audio
+
 
 class SpeechDetector:
     def __init__(self, transcription_callback, complete_callback=None, speech_callback=None, max_audio_padding=640*180):
@@ -14,13 +16,20 @@ class SpeechDetector:
         self.audio_buffer = bytearray()
         self.max_audio_padding = max_audio_padding
 
+    def test_trigger_transcript(self, transcription_buffer=None):
+        print(f"trigger_transcript is speaking {self.is_speaking}  buffer len {len(transcription_buffer)}")
+        if self.is_speaking:
+            transcribe_thread = threading.Thread(target=preprocess_transcribe_audio, kwargs={'data': bytes(transcription_buffer), 'transcription_callback': self.transcription_complete})
+            transcription_buffer.clear()
+            transcribe_thread.start()
+
     def reset_timers(self):
         if self.last_speech_timer is not None:
             self.last_speech_timer.cancel()
         if self.llm_timer is not None:
             self.llm_timer.cancel()
         
-        self.last_speech_timer = threading.Timer(self.transcription_delay, self.transcription_callback, kwargs={'transcription_buffer': self.audio_buffer})
+        self.last_speech_timer = threading.Timer(self.transcription_delay, self.test_trigger_transcript, kwargs={'transcription_buffer': self.audio_buffer})
         self.llm_timer = threading.Timer(self.llm_delay, self.call_llm)
 
         self.last_speech_timer.start()
@@ -33,6 +42,7 @@ class SpeechDetector:
 
     def silero_response(self, val, prob):
         if val == "Speech":
+            print(f"Speech detected {prob}")
             if not self.is_speaking:
                 self.is_speaking = True
             self.reset_timers()

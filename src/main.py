@@ -1,6 +1,4 @@
-import queue
 import os
-import threading
 import asyncio
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
@@ -12,7 +10,6 @@ load_dotenv()
 
 from call_management_service import CallManager
 from hearing.vad import vad_detect
-from hearing.whisper_transcribe import preprocess_transcribe_audio
 from hearing.speech_detector import SpeechDetector
 from language.openai_client import OpenAILLMClient
 from speech.tts import text_to_speech_input_streaming
@@ -65,13 +62,6 @@ async def websocket_audio_endpoint(websocket: WebSocket, callId: str):
 
     transcription_buffer = bytearray()
     audio_padding_size = 512 * 1 # ~ 30ms audio data?
-
-
-    def transcript(transcription_buffer):
-        print(f"trascript called! with buffer size {len(transcription_buffer)}")
-        transcribe_thread = threading.Thread(target=preprocess_transcribe_audio, kwargs={'data': bytes(transcription_buffer), 'transcription_callback': detector.transcription_complete})
-        transcription_buffer.clear()
-        transcribe_thread.start()
 
     def complete_transcript():
         full_transcription = detector.get_transcription_and_clear()
