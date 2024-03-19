@@ -30,13 +30,12 @@ def is_hallucination(target_str):
     return False  # No match found
 
 def preprocess_transcribe_audio(data: bytes, transcription_callback=None):
-        print(len(data))
         try:
             # Transcribe the audio
             sound = np.frombuffer(data, dtype=np.int16)
             waveform = Int2Float(sound)
-            result = model.transcribe(audio=waveform)
-            if transcription_callback is not None and not is_hallucination(result["text"]):
+            result = model.transcribe(audio=waveform, suppress_blank=False)            
+            if transcription_callback is not None and not is_hallucination(result["text"]) and result['segments'][0]['avg_logprob'] > -1.0 and result['segments'][0]['no_speech_prob'] < 0.5:
                 transcription_callback(result["text"])
         except Exception as e:
             print(f"Error transcribing audio: {e}")
