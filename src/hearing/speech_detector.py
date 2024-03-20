@@ -6,8 +6,8 @@ class SpeechDetector:
     def __init__(self, complete_callback=None, speech_callback=None, max_audio_padding=640*180):
         self.last_speech_timer = None
         self.llm_timer = None
-        self.transcription_delay = 0.2
-        self.llm_delay = 4.0
+        self.transcription_delay = 0.200
+        self.llm_delay = 0.250
         self.is_speaking = False
         self.current_transcription = ''
         self.complete_callback = complete_callback
@@ -22,17 +22,19 @@ class SpeechDetector:
             transcription_buffer.clear()
             transcribe_thread.start()
 
-    def reset_timers(self):
+    def reset_transcript_timer(self):
         if self.last_speech_timer is not None:
             self.last_speech_timer.cancel()
+
+        self.last_speech_timer = threading.Timer(self.transcription_delay, self.test_trigger_transcript, kwargs={'transcription_buffer': self.audio_buffer})
+        self.last_speech_timer.start()
+
+    def reset_llm_timer(self):
         if self.llm_timer is not None:
             self.llm_timer.cancel()
-        
-        self.last_speech_timer = threading.Timer(self.transcription_delay, self.test_trigger_transcript, kwargs={'transcription_buffer': self.audio_buffer})
         self.llm_timer = threading.Timer(self.llm_delay, self.call_llm)
-
-        self.last_speech_timer.start()
         self.llm_timer.start()
+
 
     def call_llm(self):
         self.is_speaking = False
@@ -44,7 +46,9 @@ class SpeechDetector:
             print(f"Speech detected {prob}")
             if not self.is_speaking:
                 self.is_speaking = True
-            self.reset_timers()
+            if self.llm_timer is not None:
+                self.llm_timer.cancel()
+            self.reset_transcript_timer()
 
     def on_audio(self, audio: bytes):
         self.audio_buffer.extend(audio)
@@ -54,8 +58,7 @@ class SpeechDetector:
     def transcription_complete(self, res):
         self.current_transcription += res
         if self.estimate_end_of_query(res):
-            self.reset_timers()
-            self.call_llm()
+            self.reset_llm_timer()
 
     def get_transcription_and_clear(self):
         res = self.current_transcription
