@@ -22,6 +22,8 @@ Run the docker image
 docker run --env-file=sample-env.list -p 8000:8000 conversa
 ```
 
+### Run demo application
+You can find a demo application using the Conversa web client [here](https://github.com/fpinnola/conversa-js-client/tree/main/example)
 
 ## Implementation Details
 > ❗❗: **This is being rewritten often and needs updating**
