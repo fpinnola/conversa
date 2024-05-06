@@ -26,7 +26,6 @@ docker run --env-file=sample-env.list -p 8000:8000 conversa
 You can find a demo application using the Conversa web client [here](https://github.com/fpinnola/conversa-js-client/tree/main/example)
 
 ## Implementation Details
-> ❗❗: **This is being rewritten often and needs updating**
 
 ![Group 10 (1)](https://github.com/fpinnola/conversa/assets/45111715/64896766-a442-4a4e-8b1e-cfaa1ec2d905)
 
